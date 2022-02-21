@@ -6,6 +6,10 @@
 
 static Eeprom24C04_16 eeprom(EEPROM_ADDRESS);
 
+  // Declare byte arrays.
+  byte inputBytes[1024] = { 0 };
+
+
 void setup()
 {
   // Initialize serial communication.
@@ -13,9 +17,6 @@ void setup()
 
   // Initiliaze EEPROM library.
   eeprom.initialize();
-
-  // Declare byte arrays.
-  byte inputBytes[1024] = { 0 };
 
   // Read array with bytes read from EEPROM memory.
   Serial.println("Read bytes from EEPROM memory...");
