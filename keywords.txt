@@ -12,11 +12,14 @@
 
 initialize	KEYWORD2
 writeByte	KEYWORD2
+writeByte_24C01_02  KEYWORD2
 writeByte_24C04_16  KEYWORD2
-writeBytes	KEYWORD2
-writeBytes_24C04_16	KEYWORD2
+writeBytes  KEYWORD2
+writeBytes_24C01_02 KEYWORD2
+writeBytes_24C04_16 KEYWORD2
 readByte	KEYWORD2
 readBytes	KEYWORD2
+readBytes_24C01_02  KEYWORD2
 readBytes_24C04_16  KEYWORD2
 writePage	KEYWORD2
 writeBuffer	KEYWORD2
@@ -27,6 +30,7 @@ readBuffer	KEYWORD2
 ################################################################################
 
 Eeprom24C04_16	KEYWORD2
+Eeprom24C01_16	KEYWORD2
 
 ################################################################################
 # Constants (LITERAL1)
