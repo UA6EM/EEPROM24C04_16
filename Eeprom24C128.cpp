@@ -21,191 +21,305 @@
  ******************************************************************************/
 
 /**************************************************************************//**
- * \headerfile Eeprom24C128.h
+ * \file Eeprom24C128.cpp
  ******************************************************************************/
 
-#ifndef Eeprom24C128_h
-#define Eeprom24C128_h
-
 /******************************************************************************
- * Header file inclusion.
+ * Header file inclusions.
  ******************************************************************************/
 
 #include <Arduino.h>
+#include <Wire.h>
+
+#include <Eeprom24C128.h>
+
+/******************************************************************************
+ * Private macro definitions.
+ ******************************************************************************/
 
 /**************************************************************************//**
- * \class Eeprom24C128
- *
- * \brief EEPROM 24C128 / 24C256 memory driver.
- *
- * This driver is mainly designed for 24C128 and 24C256 EEPROM memories.
+ * \def EEPROM__PAGE_SIZE
+ * \brief Size of a page in EEPROM memory.
+ * This size is given by EEPROM memory datasheet.
  ******************************************************************************/
-class Eeprom24C128
+#define EEPROM__PAGE_SIZE         64
+
+/**************************************************************************//**
+ * \def EEPROM__RD_BUFFER_SIZE
+ * \brief Size of input TWI buffer.
+ * This size is equal to BUFFER_LENGTH defined in Wire library (32 bytes).
+ ******************************************************************************/
+#define EEPROM__RD_BUFFER_SIZE    BUFFER_LENGTH
+
+/**************************************************************************//**
+ * \def EEPROM__WR_BUFFER_SIZE
+ * \brief Size of output TWI buffer.
+ * This size is equal to BUFFER_LENGTH - 1 byte reserved for address.
+ ******************************************************************************/
+#define EEPROM__WR_BUFFER_SIZE    (BUFFER_LENGTH - 1)
+
+/******************************************************************************
+ * Public method definitions.
+ ******************************************************************************/
+
+/**************************************************************************//**
+ * \fn Eeprom24C128::Eeprom24C128(byte deviceAddress)
+ *
+ * \brief Constructor.
+ *
+ * \param   deviceAddress   EEPROM address on TWI bus.
+ ******************************************************************************/
+Eeprom24C128::Eeprom24C128
+(
+    byte deviceAddress
+){
+    m_deviceAddress = deviceAddress;
+}
+
+/**************************************************************************//**
+ * \fn void Eeprom24C128::initialize()
+ *
+ * \brief Initialize library and TWI bus.
+ *
+ * If several devices are connected to TWI bus, this method mustn't be
+ * called. TWI bus must be initialized out of this library using
+ * Wire.begin() method.
+ ******************************************************************************/
+void
+Eeprom24C128::initialize()
 {
-    public:
+    Wire.begin();
+}
 
-        /******************************************************************//**
-         * \fn Eeprom24C128(byte deviceAddress)
-         *
-         * \brief Constructor.
-         *
-         * \param   deviceAddress   EEPROM address on TWI bus.
-         **********************************************************************/
-        Eeprom24C128
-        (
-            byte deviceAddress
-        );
+/**************************************************************************//**
+ * \fn void Eeprom24C128::writeByte(
+ * word address,
+ * byte data)
+ *
+ * \brief Write a byte in EEPROM memory.
+ *
+ * \remarks A delay of 10 ms is required after write cycle.
+ *
+ * \param   address Address.
+ * \param   data    Byte to write.
+ ******************************************************************************/
+void
+Eeprom24C128::writeByte
+(
+    word    address,
+    byte    data
+){
+    Wire.beginTransmission((byte)(m_deviceAddress | ((address >> 8) & 0x07)));
+    Wire.write(address & 0xFF);
+    Wire.write(data);
+    Wire.endTransmission();
+}
 
-        /******************************************************************//**
-         * \fn void initialize()
-         *
-         * \brief Initialize library abnd TWI bus.
-         *
-         * If several devices are connected to TWI bus, this method mustn't be
-         * called. TWI bus must be initialized out of this library using
-         * Wire.begin() method.
-         **********************************************************************/
-        void
-        initialize();
+/**************************************************************************//**
+ * \fn void Eeprom24C128::writeBytes(
+ * word     address,
+ * word     length,
+ * byte*    p_data)
+ *
+ * \brief Write bytes in EEPROM memory.
+ *
+ * \param       address Start address.
+ * \param       length  Number of bytes to write.
+ * \param[in]   p_data  Bytes to write.
+ ******************************************************************************/
+void
+Eeprom24C128::writeBytes
+(
+    word    address,
+    word    length,
+    byte*   p_data
+){
+    // Write first page if not aligned.
+    byte notAlignedLength = 0;
+    byte pageOffset = address % EEPROM__PAGE_SIZE;
+    if (pageOffset > 0)
+    {
+        notAlignedLength = EEPROM__PAGE_SIZE - pageOffset;
+        writePage(address, notAlignedLength, p_data);
+        length -= notAlignedLength;
+    }
 
-        /******************************************************************//**
-         * \fn void writeByte(
-         * word address,
-         * byte data)
-         *
-         * \brief Write a byte in EEPROM memory.
-         *
-         * \remarks A delay of 10 ms is required after write cycle.
-         *
-         * \param   address Address.
-         * \param   data    Byte to write.
-         **********************************************************************/
-        void
-        writeByte
-        (
-            word    address,
-            byte    data
-        );
+    if (length > 0)
+    {
+        address += notAlignedLength;
+        p_data += notAlignedLength;
 
-        /******************************************************************//**
-         * \fn void writeBytes(
-         * word     address,
-         * word     length,
-         * byte*    p_data)
-         *
-         * \brief Write bytes in EEPROM memory.
-         *
-         * \param       address Start address.
-         * \param       length  Number of bytes to write.
-         * \param[in]   p_data  Bytes to write.
-         **********************************************************************/
-        void
-        writeBytes
-        (
-            word    address,
-            word    length,
-            byte*   p_data
-        );
+        // Write complete and aligned pages.
+        byte pageCount = length / EEPROM__PAGE_SIZE;
+        for (byte i = 0; i < pageCount; i++)
+        {
+            writePage(address, EEPROM__PAGE_SIZE, p_data);
+            address += EEPROM__PAGE_SIZE;
+            p_data += EEPROM__PAGE_SIZE;
+            length -= EEPROM__PAGE_SIZE;
+        }
 
-        /******************************************************************//**
-         * \fn byte readByte(word address)
-         *
-         * \brief Read a byte in EEPROM memory.
-         *
-         * \param   address Address.
-         *
-         * \return Read byte.
-         **********************************************************************/
-        byte
-        readByte
-        (
-            word    address
-        );
+        if (length > 0)
+        {
+            // Write remaining uncomplete page.
+            writePage(address, EEPROM__PAGE_SIZE, p_data);
+        }
+    }
+}
 
-        /******************************************************************//**
-         * \fn void readBytes(
-         * word     address,
-         * word     length,
-         * byte*    p_data)
-         *
-         * \brief Read bytes in EEPROM memory.
-         *
-         * \param       address Start address.
-         * \param       length  Number of bytes to read.
-         * \patam[in]   p_data  Byte array to fill with read bytes.
-         **********************************************************************/
-        void
-        readBytes
-        (
-            word    address,
-            word    length,
-            byte*   p_buffer
-        );
+/**************************************************************************//**
+ * \fn byte Eeprom24C128::readByte(word address)
+ *
+ * \brief Read a byte in EEPROM memory.
+ *
+ * \param   address Address.
+ *
+ * \return Read byte.
+ ******************************************************************************/
+byte
+Eeprom24C128::readByte
+(
+    word address
+){
+    Wire.beginTransmission((byte)(m_deviceAddress | ((address >> 8) & 0x07)));
+    Wire.write(address & 0xFF);
+    Wire.endTransmission();
+    Wire.requestFrom((byte)(m_deviceAddress | ((address >> 8) & 0x07)), (byte)1);
+    byte data = 0;
+    if (Wire.available())
+    {
+        data = Wire.read();
+    }
+    return data;
+}
 
-    private:
+/**************************************************************************//**
+ * \fn void Eeprom24C128::readBytes(
+ * word     address,
+ * word     length,
+ * byte*    p_data)
+ *
+ * \brief Read bytes in EEPROM memory.
+ *
+ * \param       address Start address.
+ * \param       length  Number of bytes to read.
+ * \patam[in]   p_data  Byte array to fill with read bytes.
+ ******************************************************************************/
+void
+Eeprom24C128::readBytes
+(
+    word    address,
+    word    length,
+    byte*   p_data
+){
+    byte bufferCount = length / EEPROM__RD_BUFFER_SIZE;
+    for (byte i = 0; i < bufferCount; i++)
+    {
+        word offset = i * EEPROM__RD_BUFFER_SIZE;
+        readBuffer(address + offset, EEPROM__RD_BUFFER_SIZE, p_data + offset);
+    }
 
-        byte m_deviceAddress;
+    byte remainingBytes = length % EEPROM__RD_BUFFER_SIZE;
+    word offset = length - remainingBytes;
+    readBuffer(address + offset, remainingBytes, p_data + offset);
+}
 
-        /******************************************************************//**
-         * \fn void writePage(
-         * word     address,
-         * byte     length,
-         * byte*    p_data)
-         *
-         * \brief Write page in EEPROM memory.
-         *
-         * \param       address Start address.
-         * \param       length  Number of bytes (64 bytes max).
-         * \param[in]   p_data  Data.
-         **********************************************************************/
-        void
-        writePage
-        (
-            word    address,
-            byte    length,
-            byte*   p_data
-        );
+/******************************************************************************
+ * Private method definitions.
+ ******************************************************************************/
 
-        /******************************************************************//**
-         * \fn void writeBuffer(
-         * word     address,
-         * byte     length,
-         * byte*    p_data)
-         *
-         * \brief Write bytes into memory.
-         *
-         * \param       address Start address.
-         * \param       length  Number of bytes (30 bytes max).
-         * \param[in]   p_date  Data.
-         **********************************************************************/
-        void
-        writeBuffer
-        (
-            word    address,
-            byte    length,
-            byte*   p_data
-       );
+/**************************************************************************//**
+ * \fn void Eeprom24C128::writePage(
+ * word     address,
+ * byte     length,
+ * byte*    p_data)
+ *
+ * \brief Write page in EEPROM memory.
+ *
+ * \param       address Start address.
+ * \param       length  Number of bytes (EEPROM__PAGE_SIZE bytes max).
+ * \param[in]   p_data  Data.
+ ******************************************************************************/
+void
+Eeprom24C128::writePage
+(
+    word    address,
+    byte    length,
+    byte*   p_data
+){
+    // Write complete buffers.
+    byte bufferCount = length / EEPROM__WR_BUFFER_SIZE;
+    for (byte i = 0; i < bufferCount; i++)
+    {
+        byte offset = i * EEPROM__WR_BUFFER_SIZE;
+        writeBuffer(address + offset, EEPROM__WR_BUFFER_SIZE, p_data + offset);
+    }
 
-        /******************************************************************//**
-         * \fn void readBuffer(
-         * word     address,
-         * byte     length,
-         * byte*    p_data)
-         *
-         * \brief Read bytes in memory.
-         *
-         * \param       address Start address.
-         * \param       length  Number of bytes to read (32 bytes max).
-         * \param[in]   p_data  Buffer to fill with read bytes.
-         **********************************************************************/
-        void
-        readBuffer
-        (
-            word    address,
-            byte    length,
-            byte*   p_data
-        );
-};
+    // Write remaining bytes.
+    byte remainingBytes = length % EEPROM__WR_BUFFER_SIZE;
+    byte offset = length - remainingBytes;
+    writeBuffer(address + offset, remainingBytes, p_data + offset);
+}
 
-#endif // Eeprom24C128_h
+/**************************************************************************//**
+ * \fn void Eeprom24C128::writeBuffer(
+ * word     address,
+ * byte     length,
+ * byte*    p_data)
+ *
+ * \brief Write bytes into memory.
+ *
+ * \param       address Start address.
+ * \param       length  Number of bytes (EEPROM__WR_BUFFER_SIZE bytes max).
+ * \param[in]   p_data  Data.
+ ******************************************************************************/
+void
+Eeprom24C128::writeBuffer
+(
+    word    address,
+    byte    length,
+    byte*   p_data
+){
+    Wire.beginTransmission((byte)(m_deviceAddress | ((address >> 8) & 0x07)));
+    Wire.write(address & 0xFF);
+    for (byte i = 0; i < length; i++)
+    {
+        Wire.write(p_data[i]);
+    }
+    Wire.endTransmission();
 
+    // Write cycle time (tWR). See EEPROM memory datasheet for more details.
+    delay(10);
+}
+
+/**************************************************************************//**
+ * \fn void Eeprom24C128::readBuffer(
+ * word     address,
+ * byte     length,
+ * byte*    p_data)
+ *
+ * \brief Read bytes in memory.
+ *
+ * \param       address Start address.
+ * \param       length  Number of bytes (EEPROM__RD_BUFFER_SIZE bytes max).
+ * \param[in]   p_data  Buffer to fill with read bytes.
+ ******************************************************************************/
+void
+Eeprom24C128::readBuffer
+(
+    word    address,
+    byte    length,
+    byte*   p_data
+){
+    Wire.beginTransmission((byte)(m_deviceAddress | ((address >> 8) & 0x07)));
+    Wire.write(address & 0xFF);
+    Wire.endTransmission();
+    Wire.requestFrom((byte)(m_deviceAddress | ((address >> 8) & 0x07)), length);
+    for (byte i = 0; i < length; i++)
+    {
+        if (Wire.available())
+        {
+            p_data[i] = Wire.read();
+        }
+    }
+}
