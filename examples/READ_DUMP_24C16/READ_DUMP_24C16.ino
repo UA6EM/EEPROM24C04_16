@@ -10,7 +10,7 @@ static Eeprom24C04_16 eeprom(EEPROM_ADDRESS);
 byte inputBytes[1024] = { 0 };
 
 // смещение адреса для выводы на печать
-int j = 0;
+uint16_t j = 0;
 
 void setup()
 {
@@ -42,7 +42,7 @@ void printDump(void) {
       Serial.print((i + j), HEX);
       Serial.print("   ");
     }
-    if (inputBytes[i] < 10)Serial.print("0");
+    if (inputBytes[i] < 16)Serial.print("0");
     Serial.print(inputBytes[i], HEX);
     Serial.print(" ");
   }
