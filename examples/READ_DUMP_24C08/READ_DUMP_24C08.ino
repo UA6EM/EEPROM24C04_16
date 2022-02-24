@@ -1,4 +1,4 @@
-// READ DUMP AT24C04 (C)UA6EM 22.02.2022
+// READ DUMP AT24C08 (C)UA6EM 22.02.2022
 
 #include <Wire.h>
 #include <Eeprom24C04_16.h>
@@ -33,7 +33,7 @@ void setup()
       Serial.print(i, HEX);
       Serial.print("   ");
     }
-    if (inputBytes[i] < 10)Serial.print("0");
+    if (inputBytes[i] < 16)Serial.print("0");
     Serial.print(inputBytes[i], HEX);
     Serial.print(" ");
   }
