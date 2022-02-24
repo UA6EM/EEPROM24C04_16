@@ -1,7 +1,7 @@
 EEPROM24C04_16
 ==============
 
-Добавлена поддержка чипов 24С01 и 24С02 (branch - ua6em) 
+Добавлена поддержка чипов 24С01,24С02,24C32,24C64,24C128,24C256,24C512,24C1024 (branch - ua6em) 
 EEPROM 24C01 / 24C16 library for Arduino - by Julien Le Sech
 
 where it came from
