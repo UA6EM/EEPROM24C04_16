@@ -34,7 +34,7 @@ void setup()
       Serial.print(i, HEX);
       Serial.print("   ");
     }
-    if (inputBytes[i] < 10)Serial.print("0");
+    if (inputBytes[i] < 16)Serial.print("0");
     Serial.print(inputBytes[i], HEX);
     Serial.print(" ");
   }
