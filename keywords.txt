@@ -31,6 +31,10 @@ readBuffer	KEYWORD2
 
 Eeprom24C04_16	KEYWORD2
 Eeprom24C01_16	KEYWORD2
+Eeprom24C32	KEYWORD2
+Eeprom24C128	KEYWORD2
+Eeprom24C512	KEYWORD2
+Eeprom24C1024	KEYWORD2
 
 ################################################################################
 # Constants (LITERAL1)
